@@ -62,6 +62,14 @@ function insertTranslation(block: Element, translatedText: string): void {
   const wrapper = document.createElement('div');
   wrapper.className = 'llmtr-translation';
   wrapper.textContent = translatedText;
+
+  const originalColor = window.getComputedStyle(block).color;
+  try {
+    wrapper.style.color = `color-mix(in srgb, ${originalColor} 78%, #8a8a8a)`;
+  } catch {
+    wrapper.style.color = originalColor;
+  }
+
   const display = window.getComputedStyle(block).display;
   if (display.startsWith('inline')) {
     block.after(wrapper);
