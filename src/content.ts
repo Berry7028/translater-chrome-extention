@@ -3,13 +3,9 @@ import type { Profile, ContentMessage, TranslateResponse } from './types';
 const TRANSLATED_ATTR = 'data-llmtr-id';
 const BATCH_SIZE = 15;
 const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, td, th, dd, dt, pre, div[dir="auto"]';
-const MUTATION_DEBOUNCE_MS = 600;
 
 let translating = false;
 let nextId = 0;
-let activeProfile: Profile | null = null;
-let observer: MutationObserver | null = null;
-let mutationTimer: number | undefined;
 const originalTexts = new WeakMap<Element, string>();
 
 interface BlockItem {
@@ -183,38 +179,10 @@ async function processItems(items: BlockItem[], profile: Profile): Promise<{ don
   return { done, failed };
 }
 
-function startObserver(): void {
-  if (observer) return;
-  observer = new MutationObserver(() => {
-    if (!activeProfile) return;
-    clearTimeout(mutationTimer);
-    mutationTimer = window.setTimeout(async () => {
-      if (translating || !activeProfile) return;
-      const pending = pendingItems();
-      if (pending.length === 0) return;
-      translating = true;
-      try {
-        await processItems(pending, activeProfile);
-      } finally {
-        translating = false;
-      }
-    }, MUTATION_DEBOUNCE_MS);
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-}
-
-function stopObserver(): void {
-  observer?.disconnect();
-  observer = null;
-  clearTimeout(mutationTimer);
-}
-
 async function runTranslation(profile: Profile): Promise<void> {
-  activeProfile = profile;
   const items = pendingItems();
   if (items.length === 0) {
     showBanner('翻訳できる新しいテキストがありません', false);
-    startObserver();
     return;
   }
 
@@ -222,7 +190,6 @@ async function runTranslation(profile: Profile): Promise<void> {
   const { done, failed } = await processItems(items, profile);
   if (done > 0) {
     showBanner(`翻訳完了: ${done}ブロック${failed ? ` / 失敗: ${failed}` : ''}`, false);
-    startObserver();
   }
 }
 
@@ -254,8 +221,6 @@ chrome.runtime.onMessage.addListener((msg: unknown, _sender: unknown, sendRespon
       }
       if (document.querySelectorAll('.llmtr-translation').length > 0) {
         removeAllTranslations();
-        stopObserver();
-        activeProfile = null;
         sendResponse({ ok: true, removed: true });
         return false;
       }
