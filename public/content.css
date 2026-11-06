@@ -1,10 +1,17 @@
 .llmtr-translation {
   display: block;
-  margin: 0.25em 0;
+  width: 100%;
+  margin: 0.25em 0 0;
   padding: 0.1em 0;
   font-size: 0.95em;
   line-height: 1.6;
   animation: llmtr-fade-in 0.45s cubic-bezier(0.25, 0.8, 0.35, 1) both;
+}
+
+li > .llmtr-translation,
+td > .llmtr-translation,
+th > .llmtr-translation {
+  margin: 0.15em 0 0;
 }
 
 @keyframes llmtr-fade-in {

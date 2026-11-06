@@ -59,7 +59,7 @@ function collectBlocks(): Element[] {
 }
 
 function insertTranslation(block: Element, translatedText: string): void {
-  const wrapper = document.createElement('div');
+  const wrapper = document.createElement('span');
   wrapper.className = 'llmtr-translation';
   wrapper.textContent = translatedText;
 
@@ -70,12 +70,7 @@ function insertTranslation(block: Element, translatedText: string): void {
     wrapper.style.color = originalColor;
   }
 
-  const display = window.getComputedStyle(block).display;
-  if (display.startsWith('inline')) {
-    block.after(wrapper);
-  } else {
-    block.parentNode?.insertBefore(wrapper, block.nextSibling);
-  }
+  block.appendChild(wrapper);
 }
 
 async function translateBatch(items: BlockItem[], profile: Profile): Promise<string[]> {
