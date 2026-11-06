@@ -91,6 +91,9 @@ function insertTranslation(block: Element, translatedText: string): void {
   }
   wrapper.style.whiteSpace = 'normal';
   wrapper.style.overflowWrap = 'anywhere';
+  wrapper.addEventListener('animationend', () => {
+    wrapper.style.animation = 'none';
+  }, { once: true });
 
   block.appendChild(wrapper);
 }
