@@ -21,17 +21,52 @@ async function getActiveProfile(): Promise<Profile | null> {
   return profiles.find(p => p.id === activeProfileId) ?? profiles[0] ?? null;
 }
 
-async function translateBatch(texts: string[], profile: Profile): Promise<string[]> {
-  const prompt = (profile.prompt || DEFAULT_PROMPT).replace('{TEXT}', JSON.stringify(texts));
-  const base = profile.endpoint.replace(/\/+$/, '');
-  const url = base.endsWith('/chat/completions') ? base : base + '/chat/completions';
+async function translateOne(text: string, profile: Profile, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(buildUrl(profile), {
+    method: 'POST',
+    signal,
+    headers: buildHeaders(profile),
+    body: JSON.stringify({
+      model: profile.model,
+      messages: [
+        { role: 'system', content: '[plamo-translate]\ntarget_lang=ja' },
+        { role: 'user', content: text }
+      ],
+      temperature: 0,
+      stop: ['<|plamo:tag|>', '<|plamo:bos|>']
+    })
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`API error ${res.status}: ${body.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  const content: string | undefined = data?.choices?.[0]?.message?.content;
+  if (!content) throw new Error('APIから応答が返りませんでした');
+  return content.trim();
+}
 
+async function translateBatchPlamo(texts: string[], profile: Profile): Promise<string[]> {
+  return Promise.all(texts.map(text => translateOne(text, profile)));
+}
+
+function buildUrl(profile: Profile): string {
+  const base = profile.endpoint.replace(/\/+$/, '');
+  return base.endsWith('/chat/completions') ? base : base + '/chat/completions';
+}
+
+function buildHeaders(profile: Profile): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (profile.apiKey) headers['Authorization'] = `Bearer ${profile.apiKey}`;
+  return headers;
+}
 
-  const res = await fetch(url, {
+async function translateBatch(texts: string[], profile: Profile): Promise<string[]> {
+  if (profile.mode === 'plamo') return translateBatchPlamo(texts, profile);
+  const prompt = (profile.prompt || DEFAULT_PROMPT).replace('{TEXT}', JSON.stringify(texts));
+  const res = await fetch(buildUrl(profile), {
     method: 'POST',
-    headers,
+    headers: buildHeaders(profile),
     body: JSON.stringify({
       model: profile.model,
       messages: [

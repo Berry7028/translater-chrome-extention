@@ -1,3 +1,5 @@
+export type TranslationMode = 'json' | 'plamo';
+
 export interface Profile {
   id: string;
   name: string;
@@ -5,6 +7,7 @@ export interface Profile {
   apiKey?: string;
   model: string;
   prompt?: string;
+  mode?: TranslationMode;
 }
 
 export interface TranslateRequest {

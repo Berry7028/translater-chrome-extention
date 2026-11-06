@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { Profile } from '../types';
+import type { Profile, TranslationMode } from '../types';
 import { getProfiles, setActiveProfile, saveProfile, deleteProfile } from '../storage';
 
 interface ProfileForm {
@@ -9,9 +9,10 @@ interface ProfileForm {
   apiKey: string;
   model: string;
   prompt: string;
+  mode: TranslationMode;
 }
 
-const EMPTY_FORM: ProfileForm = { id: '', name: '', endpoint: '', apiKey: '', model: '', prompt: '' };
+const EMPTY_FORM: ProfileForm = { id: '', name: '', endpoint: '', apiKey: '', model: '', prompt: '', mode: 'json' };
 
 interface ProfileItemProps {
   profile: Profile;
@@ -52,7 +53,7 @@ export default function App() {
 
   const startEdit = (p: Profile) => {
     setEditing(true);
-    setForm({ id: p.id, name: p.name, endpoint: p.endpoint, apiKey: p.apiKey || '', model: p.model, prompt: p.prompt || '' });
+    setForm({ id: p.id, name: p.name, endpoint: p.endpoint, apiKey: p.apiKey || '', model: p.model, prompt: p.prompt || '', mode: p.mode || 'json' });
   };
 
   const resetForm = () => {
@@ -120,6 +121,14 @@ export default function App() {
         <div>
           <label htmlFor="model">モデル名</label>
           <input id="model" required value={form.model} onChange={setField('model')} placeholder="例: gpt-4o-mini" />
+        </div>
+        <div>
+          <label htmlFor="mode">翻訳モード</label>
+          <select id="mode" value={form.mode} onChange={setField('mode')}>
+            <option value="json">汎用LLM（JSON配列でバッチ翻訳）</option>
+            <option value="plamo">PLaMo Translate（1テキストずつ翻訳）</option>
+          </select>
+          <div className="hint">PLaMo 3 Translate を使う場合は「PLaMo Translate」を選択してください（プロンプト欄は無視されます）。</div>
         </div>
         <div>
           <label htmlFor="prompt">翻訳プロンプト</label>
