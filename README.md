@@ -75,6 +75,28 @@ ollama pull hf.co/pfnet/plamo-3-translate-0.8b-GGUF:Q4_K_M
 | 翻訳モード | **PLaMo Translate**（重要：これを選ぶとPLaMo専用のプロンプト形式で1テキストずつ翻訳します） |
 | 翻訳プロンプト | 空欄でOK（PLaMoモードでは無視されます） |
 
+### MLXを使う場合（Apple silicon Mac）
+
+Apple silicon Macなら、PFN公式のMLX版（4bit量子化・約1GB）も動かせます。
+
+```bash
+pip install -U huggingface_hub mlx-lm
+hf download pfnet/plamo-3-translate-0.8b-MLX-4bit --local-dir plamo-3-translate-0.8b-MLX-4bit
+cd plamo-3-translate-0.8b-MLX-4bit
+pip install -U -r requirements-mlx.txt
+python serve.py --model . --trust-remote-code --host 127.0.0.1 --port 8000
+```
+
+| 項目 | 設定値 |
+|---|---|
+| エンドポイント | `http://127.0.0.1:8000/v1` |
+| APIキー | 空欄 |
+| モデル名 | `.`（serve.pyのログに表示される識別子） |
+| 翻訳モード | **PLaMo Translate** |
+
+> [!WARNING]
+> MLX版の公式ドキュメントでは、対象言語の指定は `chat_template_kwargs`（本拡張機能からは送れないパラメータ）で行うことが前提とされています。日本語への翻訳（target_lang=ja 未指定時のデフォルト）は動作する見込みですが、**Ollama版（GGUF）の方が本拡張機能との相性は確実です**。MLX版でうまく翻訳されない場合はGGUF版をご利用ください。
+
 ### LM Studio / llama.cpp を使う場合
 
 - **LM Studio**: モデルをダウンロードしてサーバーを開始（`http://localhost:1234/v1`）。モデル名はLM Studioに表示される識別子を指定
