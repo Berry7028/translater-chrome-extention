@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "LLM Bilingual Translator",
+  "version": "1.0.0",
+  "description": "ショートカットキーでページ全体をバイリンガル翻訳（LLMエンドポイントはユーザー設定可能）",
+  "permissions": ["storage", "activeTab"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "translate-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "ページ全体のバイリンガル翻訳を切替"
+    },
+    "switch-profile": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+U",
+        "mac": "Command+Shift+U"
+      },
+      "description": "次の翻訳プロファイルに切替"
+    }
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LLM Bilingual Translator"
+  }
+}

@@ -1,0 +1,31 @@
+.llmtr-translation {
+  display: block;
+  margin: 0.25em 0;
+  padding: 0.1em 0;
+  color: #7c4dff;
+  font-size: 0.95em;
+  line-height: 1.6;
+}
+
+.llmtr-banner {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  background: #323232;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: system-ui, sans-serif;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  max-width: 80vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.llmtr-banner-error {
+  background: #c62828;
+}

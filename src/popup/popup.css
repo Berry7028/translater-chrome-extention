@@ -1,0 +1,16 @@
+body { width: 300px; padding: 12px; }
+h2 { margin: 0 0 10px; }
+
+.profile {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.profile.active { border-color: #7c4dff; background: #f5f0ff; font-weight: 600; }
+.profile small { display: block; color: #888; font-weight: 400; }
+
+.links { margin-top: 10px; font-size: 12px; }
+.links a { color: #7c4dff; cursor: pointer; text-decoration: underline; }
+.hint { margin-bottom: 8px; }
