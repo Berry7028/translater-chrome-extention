@@ -31,3 +31,14 @@ export async function deleteProfile(id: string): Promise<void> {
   if (activeProfileId === id) patch.activeProfileId = next[0]?.id ?? null;
   await chrome.storage.sync.set(patch);
 }
+
+export async function getAutoTranslateSites(): Promise<string[]> {
+  const { autoTranslateSites = [] } = (await chrome.storage.sync.get('autoTranslateSites')) as { autoTranslateSites?: string[] };
+  return Array.isArray(autoTranslateSites) ? autoTranslateSites : [];
+}
+
+export async function setAutoTranslateSite(host: string, enabled: boolean): Promise<void> {
+  const sites = await getAutoTranslateSites();
+  const next = enabled ? [...new Set([...sites, host])] : sites.filter(s => s !== host);
+  await chrome.storage.sync.set({ autoTranslateSites: next });
+}

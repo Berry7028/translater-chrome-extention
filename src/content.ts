@@ -2,7 +2,7 @@ import type { Profile, ContentMessage, TranslateResponse } from './types';
 
 const TRANSLATED_ATTR = 'data-llmtr-id';
 const BATCH_SIZE = 15;
-const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, td, th, dd, dt, pre';
+const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, td, th, dd, dt, pre, div[dir="auto"]';
 const MUTATION_DEBOUNCE_MS = 600;
 
 let translating = false;
@@ -222,6 +222,24 @@ async function runTranslation(profile: Profile): Promise<void> {
     startObserver();
   }
 }
+
+async function autoInit(): Promise<void> {
+  if (document.querySelector('.llmtr-translation')) return;
+  const { autoTranslateSites = [] } = (await chrome.storage.sync.get('autoTranslateSites')) as { autoTranslateSites?: string[] };
+  if (!Array.isArray(autoTranslateSites) || !autoTranslateSites.includes(location.hostname)) return;
+
+  const res = (await chrome.runtime.sendMessage({ type: 'get-active-profile' })) as { ok: boolean; profile: Profile | null } | undefined;
+  if (!res?.ok || !res.profile) return;
+
+  await new Promise(r => setTimeout(r, 800));
+  if (translating || document.querySelectorAll('.llmtr-translation').length > 0) return;
+  translating = true;
+  runTranslation(res.profile)
+    .catch(err => showBanner('翻訳エラー: ' + String(err instanceof Error ? err.message : err), true))
+    .finally(() => { translating = false; });
+}
+
+autoInit();
 
 chrome.runtime.onMessage.addListener((msg: unknown, _sender: unknown, sendResponse: (res: unknown) => void) => {
   if (msg && typeof msg === 'object' && 'type' in msg) {
