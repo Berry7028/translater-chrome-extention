@@ -113,25 +113,81 @@ function extractTranslations(content: string, expected: number): string[] | null
   return null;
 }
 
+async function runTranslateCommand(tabId: number): Promise<void> {
+  const profile = await getActiveProfile();
+  if (!profile) {
+    chrome.tabs.sendMessage(tabId, { type: 'error', message: 'プロファイルが未設定です。オプション画面で設定してください。' }).catch(() => {});
+    chrome.runtime.openOptionsPage().catch(() => {});
+    return;
+  }
+  chrome.tabs.sendMessage(tabId, { type: 'toggle-translation', profile }).catch(() => {});
+}
+
+async function switchProfile(tabId: number): Promise<void> {
+  const { profiles = [], activeProfileId = null } = await getStorage();
+  if (profiles.length < 2) return;
+  const idx = profiles.findIndex(p => p.id === activeProfileId);
+  const next = profiles[(idx + 1 + profiles.length) % profiles.length];
+  await chrome.storage.sync.set({ activeProfileId: next.id });
+  chrome.tabs.sendMessage(tabId, { type: 'status', message: `プロファイル: ${next.name}` }).catch(() => {});
+}
+
 chrome.commands.onCommand.addListener(async (command: string) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
-
   if (command === 'translate-page') {
-    const profile = await getActiveProfile();
-    if (!profile) {
-      chrome.tabs.sendMessage(tab.id, { type: 'error', message: 'プロファイルが未設定です。オプション画面で設定してください。' }).catch(() => {});
-      chrome.runtime.openOptionsPage().catch(() => {});
-      return;
-    }
-    chrome.tabs.sendMessage(tab.id, { type: 'toggle-translation', profile }).catch(() => {});
+    await runTranslateCommand(tab.id);
   } else if (command === 'switch-profile') {
-    const { profiles = [], activeProfileId = null } = await getStorage();
-    if (profiles.length < 2) return;
-    const idx = profiles.findIndex(p => p.id === activeProfileId);
-    const next = profiles[(idx + 1 + profiles.length) % profiles.length];
-    await chrome.storage.sync.set({ activeProfileId: next.id });
-    chrome.tabs.sendMessage(tab.id, { type: 'status', message: `プロファイル: ${next.name}` }).catch(() => {});
+    await switchProfile(tab.id);
+  }
+});
+
+const MENU_ID_TRANSLATE = 'llmtr-translate';
+const MENU_ID_PROFILE_PREFIX = 'llmtr-profile:';
+
+async function refreshContextMenus(): Promise<void> {
+  await chrome.contextMenus.removeAll();
+  const { profiles = [], activeProfileId = null } = await getStorage();
+
+  chrome.contextMenus.create({
+    id: MENU_ID_TRANSLATE,
+    title: '🌐 このページをバイリンガル翻訳',
+    contexts: ['page', 'selection', 'frame']
+  });
+
+  if (profiles.length > 0) {
+    chrome.contextMenus.create({
+      id: 'llmtr-profiles',
+      title: '翻訳プロファイル',
+      contexts: ['page', 'selection', 'frame']
+    });
+    for (const p of profiles) {
+      chrome.contextMenus.create({
+        id: MENU_ID_PROFILE_PREFIX + p.id,
+        parentId: 'llmtr-profiles',
+        title: (p.id === activeProfileId ? '● ' : '○ ') + p.name,
+        contexts: ['page', 'selection', 'frame']
+      });
+    }
+  }
+}
+
+chrome.runtime.onInstalled.addListener(() => { refreshContextMenus(); });
+chrome.runtime.onStartup.addListener(() => { refreshContextMenus(); });
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && (changes.profiles || changes.activeProfileId)) refreshContextMenus();
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab?.id) return;
+  if (info.menuItemId === MENU_ID_TRANSLATE) {
+    await runTranslateCommand(tab.id);
+  } else if (typeof info.menuItemId === 'string' && info.menuItemId.startsWith(MENU_ID_PROFILE_PREFIX)) {
+    const id = info.menuItemId.slice(MENU_ID_PROFILE_PREFIX.length);
+    await chrome.storage.sync.set({ activeProfileId: id });
+    const { profiles = [] } = await getStorage();
+    const p = profiles.find(x => x.id === id);
+    if (p) chrome.tabs.sendMessage(tab.id, { type: 'status', message: `プロファイル: ${p.name}` }).catch(() => {});
   }
 });
 

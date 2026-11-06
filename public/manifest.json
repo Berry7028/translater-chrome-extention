@@ -3,7 +3,7 @@
   "name": "LLM Bilingual Translator",
   "version": "1.0.0",
   "description": "ショートカットキーでページ全体をバイリンガル翻訳（LLMエンドポイントはユーザー設定可能）",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "contextMenus"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
