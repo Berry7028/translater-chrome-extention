@@ -98,6 +98,20 @@ function removeAllTranslations(): void {
   document.querySelectorAll(`[${TRANSLATED_ATTR}]`).forEach(el => el.removeAttribute(TRANSLATED_ATTR));
 }
 
+function isInViewport(el: Element): boolean {
+  const rect = (el as HTMLElement).getBoundingClientRect();
+  return rect.bottom > 0 && rect.top < window.innerHeight;
+}
+
+function prioritizeByViewport(items: BlockItem[]): BlockItem[] {
+  const inView: BlockItem[] = [];
+  const rest: BlockItem[] = [];
+  for (const item of items) {
+    (isInViewport(item.el) ? inView : rest).push(item);
+  }
+  return [...inView, ...rest];
+}
+
 async function runTranslation(profile: Profile): Promise<void> {
   const blocks = collectBlocks();
   if (blocks.length === 0) {
@@ -105,14 +119,14 @@ async function runTranslation(profile: Profile): Promise<void> {
     return;
   }
 
-  const items: BlockItem[] = blocks
+  const items: BlockItem[] = prioritizeByViewport(blocks
     .filter(el => !el.hasAttribute(TRANSLATED_ATTR))
     .map(el => {
       const id = String(nextId++);
       el.setAttribute(TRANSLATED_ATTR, id);
       return { id, el, text: (el as HTMLElement).innerText.trim() };
     })
-    .filter(i => i.text.length > 0);
+    .filter(i => i.text.length > 0));
 
   showBanner(`翻訳中... (${items.length}ブロック / プロファイル: ${profile.name})`, false);
 
