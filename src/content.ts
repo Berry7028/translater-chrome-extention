@@ -3,9 +3,14 @@ import type { Profile, ContentMessage, TranslateResponse } from './types';
 const TRANSLATED_ATTR = 'data-llmtr-id';
 const BATCH_SIZE = 15;
 const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, td, th, dd, dt, pre';
+const MUTATION_DEBOUNCE_MS = 600;
 
 let translating = false;
 let nextId = 0;
+let activeProfile: Profile | null = null;
+let observer: MutationObserver | null = null;
+let mutationTimer: number | undefined;
+const originalTexts = new WeakMap<Element, string>();
 
 interface BlockItem {
   id: string;
@@ -28,15 +33,24 @@ function isInsideTranslatedBlock(el: Element): boolean {
   return !!el.closest(`[${TRANSLATED_ATTR}]`) || !!el.closest('.llmtr-translation');
 }
 
+function hasLayoutRisk(el: Element): boolean {
+  const display = window.getComputedStyle(el).display;
+  return display.includes('flex') || display.includes('grid') || display === 'table' || display === 'table-row';
+}
+
 function collectBlocks(): Element[] {
   const blocks: Element[] = [];
+  const seen = new Set<Element>();
   const candidates = document.querySelectorAll(BLOCK_SELECTOR);
   for (const el of candidates) {
+    if (seen.has(el)) continue;
     if (!isVisible(el) || isEditable(el) || isInsideTranslatedBlock(el)) continue;
     if (el.querySelector(BLOCK_SELECTOR)) continue;
+    if (hasLayoutRisk(el)) continue;
     const text = (el as HTMLElement).innerText.trim();
     if (text.length < 2 || text.length > 5000) continue;
     if (!/[a-zA-Z\u00C0-\u024F\u0400-\u04FF\u4E00-\u9FFF\u3040-\u30FF]/.test(text)) continue;
+    seen.add(el);
     blocks.push(el);
   }
   if (blocks.length === 0) {
@@ -52,7 +66,13 @@ function collectBlocks(): Element[] {
       node = walker.nextNode();
     }
     for (const el of looseBlocks) {
-      if (isVisible(el) && (el as HTMLElement).innerText.trim().length >= 2) blocks.push(el);
+      if (seen.has(el)) continue;
+      if (!isVisible(el) || hasLayoutRisk(el)) continue;
+      const text = (el as HTMLElement).innerText.trim();
+      if (text.length >= 2 && text.length <= 5000) {
+        seen.add(el);
+        blocks.push(el);
+      }
     }
   }
   return blocks;
@@ -69,6 +89,8 @@ function insertTranslation(block: Element, translatedText: string): void {
   } catch {
     wrapper.style.color = originalColor;
   }
+  wrapper.style.whiteSpace = 'normal';
+  wrapper.style.overflowWrap = 'anywhere';
 
   block.appendChild(wrapper);
 }
@@ -93,6 +115,18 @@ function removeAllTranslations(): void {
   document.querySelectorAll(`[${TRANSLATED_ATTR}]`).forEach(el => el.removeAttribute(TRANSLATED_ATTR));
 }
 
+function invalidateChangedBlocks(): void {
+  document.querySelectorAll(`[${TRANSLATED_ATTR}]`).forEach(el => {
+    const stored = originalTexts.get(el);
+    const current = (el as HTMLElement).innerText.replace(/\s*$/, '');
+    if (stored !== undefined && stored !== current) {
+      el.querySelectorAll('.llmtr-translation').forEach(t => t.remove());
+      el.removeAttribute(TRANSLATED_ATTR);
+      originalTexts.delete(el);
+    }
+  });
+}
+
 function isInViewport(el: Element): boolean {
   const rect = (el as HTMLElement).getBoundingClientRect();
   return rect.bottom > 0 && rect.top < window.innerHeight;
@@ -107,33 +141,35 @@ function prioritizeByViewport(items: BlockItem[]): BlockItem[] {
   return [...inView, ...rest];
 }
 
-async function runTranslation(profile: Profile): Promise<void> {
-  const blocks = collectBlocks();
-  if (blocks.length === 0) {
-    showBanner('翻訳できるテキストが見つかりませんでした', true);
-    return;
-  }
-
-  const items: BlockItem[] = prioritizeByViewport(blocks
+function pendingItems(): BlockItem[] {
+  invalidateChangedBlocks();
+  return collectBlocks()
     .filter(el => !el.hasAttribute(TRANSLATED_ATTR))
     .map(el => {
       const id = String(nextId++);
       el.setAttribute(TRANSLATED_ATTR, id);
-      return { id, el, text: (el as HTMLElement).innerText.trim() };
+      const text = (el as HTMLElement).innerText.trim();
+      originalTexts.set(el, text);
+      return { id, el, text };
     })
-    .filter(i => i.text.length > 0));
+    .filter(i => i.text.length > 0);
+}
 
-  showBanner(`翻訳中... (${items.length}ブロック / プロファイル: ${profile.name})`, false);
-
+async function processItems(items: BlockItem[], profile: Profile): Promise<{ done: number; failed: number }> {
+  const ordered = prioritizeByViewport(items);
   let done = 0;
   let failed = 0;
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const batch = items.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < ordered.length; i += BATCH_SIZE) {
+    const batch = ordered.slice(i, i + BATCH_SIZE);
     try {
       const translations = await translateBatch(batch, profile);
       batch.forEach((item, j) => {
-        if (translations[j]) insertTranslation(item.el, translations[j]);
-        done++;
+        if (translations[j]) {
+          insertTranslation(item.el, translations[j]);
+          done++;
+        } else {
+          item.el.removeAttribute(TRANSLATED_ATTR);
+        }
       });
     } catch (err) {
       failed += batch.length;
@@ -141,9 +177,49 @@ async function runTranslation(profile: Profile): Promise<void> {
       showBanner('翻訳エラー: ' + String(err instanceof Error ? err.message : err), true);
     }
   }
+  return { done, failed };
+}
 
+function startObserver(): void {
+  if (observer) return;
+  observer = new MutationObserver(() => {
+    if (!activeProfile) return;
+    clearTimeout(mutationTimer);
+    mutationTimer = window.setTimeout(async () => {
+      if (translating || !activeProfile) return;
+      const pending = pendingItems();
+      if (pending.length === 0) return;
+      translating = true;
+      try {
+        await processItems(pending, activeProfile);
+      } finally {
+        translating = false;
+      }
+    }, MUTATION_DEBOUNCE_MS);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+function stopObserver(): void {
+  observer?.disconnect();
+  observer = null;
+  clearTimeout(mutationTimer);
+}
+
+async function runTranslation(profile: Profile): Promise<void> {
+  activeProfile = profile;
+  const items = pendingItems();
+  if (items.length === 0) {
+    showBanner('翻訳できる新しいテキストがありません', false);
+    startObserver();
+    return;
+  }
+
+  showBanner(`翻訳中... (${items.length}ブロック / プロファイル: ${profile.name})`, false);
+  const { done, failed } = await processItems(items, profile);
   if (done > 0) {
     showBanner(`翻訳完了: ${done}ブロック${failed ? ` / 失敗: ${failed}` : ''}`, false);
+    startObserver();
   }
 }
 
@@ -157,6 +233,8 @@ chrome.runtime.onMessage.addListener((msg: unknown, _sender: unknown, sendRespon
       }
       if (document.querySelectorAll('.llmtr-translation').length > 0) {
         removeAllTranslations();
+        stopObserver();
+        activeProfile = null;
         sendResponse({ ok: true, removed: true });
         return false;
       }
