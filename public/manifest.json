@@ -19,15 +19,15 @@
   "commands": {
     "translate-page": {
       "suggested_key": {
-        "default": "Ctrl+Shift+Y",
-        "mac": "Command+Shift+Y"
+        "default": "Alt+A",
+        "mac": "Alt+A"
       },
       "description": "ページ全体のバイリンガル翻訳を切替"
     },
     "switch-profile": {
       "suggested_key": {
-        "default": "Ctrl+Shift+U",
-        "mac": "Command+Shift+U"
+        "default": "Alt+S",
+        "mac": "Alt+S"
       },
       "description": "次の翻訳プロファイルに切替"
     }
