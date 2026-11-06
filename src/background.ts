@@ -38,7 +38,11 @@ async function translateOne(text: string, profile: Profile, signal?: AbortSignal
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`API error ${res.status}: ${body.slice(0, 300)}`);
+    let hint = '';
+    if (res.status === 403) {
+      hint = '（403: サーバーが拡張機能からのリクエストを拒否しています。Ollamaの場合は環境変数 OLLAMA_ORIGINS="*" を設定して再起動してください）';
+    }
+    throw new Error(`API error ${res.status}: ${body.slice(0, 300)}${hint}`);
   }
   const data = await res.json();
   const content: string | undefined = data?.choices?.[0]?.message?.content;
@@ -79,7 +83,11 @@ async function translateBatch(texts: string[], profile: Profile): Promise<string
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`API error ${res.status}: ${body.slice(0, 300)}`);
+    let hint = '';
+    if (res.status === 403) {
+      hint = '（403: サーバーが拡張機能からのリクエストを拒否しています。Ollamaの場合は環境変数 OLLAMA_ORIGINS="*" を設定して再起動してください）';
+    }
+    throw new Error(`API error ${res.status}: ${body.slice(0, 300)}${hint}`);
   }
 
   const data = await res.json();

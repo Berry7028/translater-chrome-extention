@@ -108,3 +108,27 @@ python serve.py --model . --trust-remote-code --host 127.0.0.1 --port 8000
 > [!NOTE]
 > PLaMo 3 Translate のライセンスは [PLaMoコミュニティライセンス](https://plamo.preferredai.jp/)（非商用は無料、商用は収益10億円未満なら事前登録で無料）です。
 > 「汎用LLM」モード（JSON配列バッチ）は、OpenAI APIなど汎用チャットモデル向けです。PLaMoは翻訳特化モデルのためJSON形式の指示に従わず、必ずPLaMoモードを使ってください。
+
+## トラブルシューティング
+
+### 翻訳時に「API error 403」が出る
+
+Chrome拡張機能からのリクエストは `chrome-extension://...` というオリジンで送られるため、オリジン制限を行うローカルサーバーに拒否されることがあります。
+
+**Ollama の場合**：環境変数 `OLLAMA_ORIGINS` を許可して再起動します。
+
+```bash
+# macOS（アプリ起動前のシェルで）
+launchctl setenv OLLAMA_ORIGINS "*"
+# その後Ollamaアプリを再起動。それでもダメならターミナルから起動:
+OLLAMA_ORIGINS="*" ollama serve
+
+# Linux / Windows（ターミナルから直接起動する場合）
+OLLAMA_ORIGINS="*" ollama serve
+# Windows（システム設定）
+setx OLLAMA_ORIGINS "*"
+```
+
+**llama.cpp（llama-server）の場合**：起動時に `--host 127.0.0.1` を付け、必要ならCORS許可の設定を確認してください。
+
+**OpenAI API など外部APIの場合**：APIキーが正しいか、利用権限・課金状態を確認してください。
