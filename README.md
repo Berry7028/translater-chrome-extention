@@ -52,3 +52,28 @@ npm run build     # 型チェック + ビルド（dist/ に出力）
 | `Ctrl+Shift+U` | 次のプロファイルへ切替 |
 
 ショートカットは `chrome://extensions/shortcuts` で変更可能。
+
+## 推奨モデル: PLaMo 3 Translate 0.8B
+
+PFNが公開した日本語特化の翻訳特化LLM [PLaMo 3 Translate](https://huggingface.co/pfnet/plamo-3-translate-0.8b)（0.8B / 2B / 8B / 31B の4サイズ）のうち、最小の **0.8B** は軽量ながら日英翻訳で既存の翻訳特化LLMを上回る性能とされており、ローカル実行と相性が良い本拡張機能の推奨モデルです。53言語に対応し、GGUF形式（llama.cpp）やMLX形式（Apple silicon）も提供されています。
+
+### ローカルで立てる（llama.cpp の場合）
+
+```bash
+# GGUF版を直接ダウンロードしてOpenAI互換サーバーを起動
+llama-server -hf pfnet/plamo-3-translate-0.8b --port 8080
+```
+
+### 拡張機能のプロファイル設定
+
+| 項目 | 設定値 |
+|---|---|
+| エンドポイント | `http://localhost:8080/v1` |
+| APIキー | 空欄（ローカルは認証不要） |
+| モデル名 | サーバーの起動ログに表示されるモデル名（例: `plamo-3-translate-0.8b`） |
+| 翻訳プロンプト | 空欄でOK（デフォルトの日本語翻訳プロンプトを使用） |
+
+Ollama を使う場合は `ollama pull hf.co/pfnet/plamo-3-translate-0.8b-GGUF` で取得し、エンドポイントを `http://localhost:11434/v1` にしてください。
+
+> [!NOTE]
+> ローカルサーバーへ拡張機能からリクエストするため、llama.cppのサーバーは `--host 127.0.0.1` で起動し、CORS設定（`--api-key` なしの場合は `--no-webui` やブラウザのオリジン許可）が必要になる場合があります。PLaMo 3 Translate のライセンスは [PLaMoコミュニティライセンス](https://plamo.preferredai.jp/)（非商用は無料、商用は収益10億円未満なら事前登録で無料）です。
